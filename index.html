@@ -9118,22 +9118,56 @@ function withdrawalYearsOf(cfg, untilAge) {
 }
 
 /**
+ * 年金をエンジンに渡すときは、必ずこれを通す。額と受給開始年齢はいつも一緒に運ぶ。
+ *
+ * ★別々に書いていたら、7か所中6か所で受給開始年齢が抜けた。★
+ * 逆算の探索は受給開始年齢を知らずに答えを出し、数え直しだけが知っていたので、
+ * 「70歳から受給」にしても答えが変わらず、確率だけが目標を割っていた。
+ * エンジン側で一度起きた「フィールドを列挙すると足したものが捨てられる」と同じ種類。
+ * ビルドが、テンプレートに otherMonthlyIncome を直接書くことを禁じている。
+ *
+ * use が false のときは年金を渡さない。率で決まる取り崩しルールでは、
+ * 年金を「必要額から差し引くもの」として渡すと取り崩しが0になりうるため。
+ * 受給開始年齢が無い（古い保存など）ときは渡さず、エンジンの既定＝取り崩し開始と同時、に任せる。
+ */
+function pensionFor(scenario, use) {
+  if (use === false) return { otherMonthlyIncome: 0 };
+  var out = { otherMonthlyIncome: scenario.pension || 0 };
+  if (scenario.pensionFromAge > 0) out.otherMonthlyIncomeFromAge = scenario.pensionFromAge;
+  return out;
+}
+
+/**
+ * 取り崩しを始めた年（初年度）に、もう年金を受け取っているか。
+ * 画面で「初年度の取り崩し＋年金＝使える額」と足すのは、これが真のときだけ。
+ * 受給開始が後なら、初年度は取り崩しだけで暮らしている（エンジンもそう計算している）。
+ */
+function pensionAtStart(scenario, withdrawFrom) {
+  if (!((scenario.pension || 0) > 0)) return false;
+  return !(scenario.pensionFromAge > withdrawFrom);
+}
+
+/** エンジンへの入力に年金を足して返す。呼び出し側は withPension({ … }, 計画, 使うか) と書く */
+function withPension(input, scenario, use) {
+  var p = pensionFor(scenario, use);
+  for (var k in p) input[k] = p[k];
+  return input;
+}
+
+/**
  * usePension が真のときだけ、年金を「必要額から差し引くもの」として渡す。
  * 率で決まるルールに年金を渡すと『年金があるぶん取り崩しを減らす』挙動になり、
  * 年金が率の額を上回ると取り崩しが0になってしまう。率ルールでは年金は加算するもの。
  */
 function runWithdrawal(cfg, strategy, usePension, untilAge) {
-  return C.monteCarloLifecycle({
+  return C.monteCarloLifecycle(withPension({
     startYear: START_YEAR, startAge: cfg.age,
     accumulationYears: cfg.years, withdrawalYears: withdrawalYearsOf(cfg, untilAge),
     funds: cfg.funds, plans: cfg.plans, buys: cfg.buys, initialHoldings: cfg.initialHoldings,
     idecoAnnualLimit: cfg.idecoAnnualLimit,
     strategy: strategy, trials: Math.min(800, cfg.trials), seed: SEED,
-    annualInflation: cfg.inflation, correlation: cfg.correlation,
-    otherMonthlyIncome: usePension ? (cfg.scenario.pension || 0) : 0,
-    // 受給開始年齢。取り崩し開始より後なら、その間は取り崩しだけで暮らす計算になる
-    otherMonthlyIncomeFromAge: cfg.scenario.pensionFromAge || cfg.withdrawFrom
-  });
+    annualInflation: cfg.inflation, correlation: cfg.correlation
+  }, cfg.scenario, usePension));
 }
 
 
@@ -9896,7 +9930,6 @@ function runWithdrawal(cfg, strategy, usePension, untilAge) {
       ["期間", plan.contributeUntil + "歳まで積立／" + plan.withdrawFrom + "歳から取り崩し"],
       ["公的年金", plan.pension > 0 ? "月 " + yen(plan.pension) : "入れていない"],
       ["年金の受給開始", plan.pension > 0 ? plan.pensionFromAge + "歳から" : "—"]
-      ["年金の受給開始", plan.pension > 0 ? plan.pensionFromAge + "歳から" : "—"]
     ].map(function (x) {
       return "<dt>" + esc(x[0]) + "</dt><dd>" + esc(x[1]) + "</dd>";
     }).join("");
@@ -10076,19 +10109,18 @@ function runWithdrawal(cfg, strategy, usePension, untilAge) {
         return { fundId: p.fundId, quota: "taxable", monthlyAmount: p.monthlyAmount,
                  startYear: p.startYear, endYear: p.endYear };
       });
-      return C.solveRequiredMonthly({
+      return C.solveRequiredMonthly(withPension({
         startYear: START_YEAR, startAge: plan.age,
         accumulationYears: b.cfg.years, withdrawalYears: withdrawalYearsOf(b.cfg),
         funds: b.funds, plans: overflow, fixedPlans: fixed,
         buys: b.cfg.buys, initialHoldings: b.cfg.initialHoldings,
         idecoAnnualLimit: b.cfg.idecoAnnualLimit,
         annualInflation: b.cfg.inflation, correlation: b.cfg.correlation,
-        otherMonthlyIncome: plan.pension || 0,
         targetMonthlyWithdrawal: plan.desiredMonthly,
         targetSuccessRate: confidence,
         trials: REV_SEARCH_TRIALS, seed: SEED,
         maxMonthly: REV_MAX_MONTHLY, tolerance: REV_STEP
-      });
+      }, plan));
     } catch (e) {
       return null;
     }
@@ -10270,19 +10302,18 @@ function runWithdrawal(cfg, strategy, usePension, untilAge) {
   }
 
   function solveOne(b, trials, maxMonthly) {
-    return C.solveRequiredMonthly({
+    return C.solveRequiredMonthly(withPension({
       startYear: START_YEAR, startAge: plan.age,
       accumulationYears: b.cfg.years, withdrawalYears: withdrawalYearsOf(b.cfg),
       funds: b.funds, plans: b.plans,
       buys: b.cfg.buys, initialHoldings: b.cfg.initialHoldings,
       idecoAnnualLimit: b.cfg.idecoAnnualLimit,
       annualInflation: b.cfg.inflation, correlation: b.cfg.correlation,
-      otherMonthlyIncome: plan.pension || 0,
       targetMonthlyWithdrawal: plan.desiredMonthly,
       targetSuccessRate: confidence,
       trials: trials, seed: SEED,
       maxMonthly: maxMonthly, tolerance: REV_STEP
-    });
+    }, plan));
   }
 
   function solveGeneric() {
@@ -10420,18 +10451,17 @@ function runWithdrawal(cfg, strategy, usePension, untilAge) {
   var revGen = 0;
 
   function solverInput(b, plans, fixedPlans) {
-    return {
+    return withPension({
       startYear: START_YEAR, startAge: plan.age,
       accumulationYears: b.cfg.years, withdrawalYears: withdrawalYearsOf(b.cfg),
       funds: b.funds, plans: plans, fixedPlans: fixedPlans || [],
       buys: b.cfg.buys, initialHoldings: b.cfg.initialHoldings,
       idecoAnnualLimit: b.cfg.idecoAnnualLimit,
       annualInflation: b.cfg.inflation, correlation: b.cfg.correlation,
-      otherMonthlyIncome: plan.pension || 0,
       targetMonthlyWithdrawal: plan.desiredMonthly,
       trials: REV_SEARCH_TRIALS, seed: SEED,
       maxMonthly: REV_MAX_MONTHLY, tolerance: REV_STEP
-    };
+    }, plan);
   }
 
   /**
@@ -10572,17 +10602,16 @@ function runWithdrawal(cfg, strategy, usePension, untilAge) {
 
   function solveAges(b, monthly) {
     METRICS.count("/run/age");
-    return C.solveRequiredAgeLadder({
+    return C.solveRequiredAgeLadder(withPension({
       startYear: START_YEAR, startAge: plan.age, funds: b.funds,
       buys: b.cfg.buys, initialHoldings: b.cfg.initialHoldings,
       idecoAnnualLimit: b.cfg.idecoAnnualLimit,
       annualInflation: b.cfg.inflation, correlation: b.cfg.correlation,
-      otherMonthlyIncome: plan.pension || 0,
       targetMonthlyWithdrawal: plan.desiredMonthly,
       trials: REV_SEARCH_TRIALS, seed: SEED,
       lifeEndAge: 100, minAge: plan.age + 1, maxAge: AGE_LAST,
       plansFor: function (years) { return plansForYears(b, years, monthly); }
-    }, LADDER);
+    }, plan), LADDER);
   }
 
   function ageHtml(res, monthly) {
@@ -10661,19 +10690,18 @@ function runWithdrawal(cfg, strategy, usePension, untilAge) {
     var cfg = b.cfg;
     var res;
     try {
-      res = C.solveRequiredMonthly({
+      res = C.solveRequiredMonthly(withPension({
         startYear: START_YEAR, startAge: plan.age,
         accumulationYears: cfg.years, withdrawalYears: withdrawalYearsOf(cfg),
         funds: b.funds, plans: b.plans,
         buys: cfg.buys, initialHoldings: cfg.initialHoldings,
         idecoAnnualLimit: cfg.idecoAnnualLimit,
         annualInflation: cfg.inflation, correlation: cfg.correlation,
-        otherMonthlyIncome: plan.pension || 0,
         targetMonthlyWithdrawal: plan.desiredMonthly,
         targetSuccessRate: confidence,
         trials: REV_SEARCH_TRIALS, seed: SEED,
         maxMonthly: REV_MAX_MONTHLY, tolerance: REV_STEP
-      });
+      }, plan));
     } catch (e) {
       revStop("計算できませんでした", (e && e.message) ? e.message : String(e));
       return;
@@ -10793,6 +10821,7 @@ function runWithdrawal(cfg, strategy, usePension, untilAge) {
       ["期間", plan.contributeUntil + "歳まで積立／" + plan.withdrawFrom + "歳から取り崩し"],
       ["ほしい生活費", plan.desiredMonthly > 0 ? "月 " + yen(plan.desiredMonthly) : "未設定"],
       ["公的年金", plan.pension > 0 ? "月 " + yen(plan.pension) : "入れていない"],
+      ["年金の受給開始", plan.pension > 0 ? plan.pensionFromAge + "歳から" : "—"],
       ["確実さの目標", pct(confidence)]
     ].map(function (x) {
       return "<dt>" + esc(x[0]) + "</dt><dd>" + esc(x[1]) + "</dd>";

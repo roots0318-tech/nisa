@@ -9147,22 +9147,56 @@ function withdrawalYearsOf(cfg, untilAge) {
 }
 
 /**
+ * 年金をエンジンに渡すときは、必ずこれを通す。額と受給開始年齢はいつも一緒に運ぶ。
+ *
+ * ★別々に書いていたら、7か所中6か所で受給開始年齢が抜けた。★
+ * 逆算の探索は受給開始年齢を知らずに答えを出し、数え直しだけが知っていたので、
+ * 「70歳から受給」にしても答えが変わらず、確率だけが目標を割っていた。
+ * エンジン側で一度起きた「フィールドを列挙すると足したものが捨てられる」と同じ種類。
+ * ビルドが、テンプレートに otherMonthlyIncome を直接書くことを禁じている。
+ *
+ * use が false のときは年金を渡さない。率で決まる取り崩しルールでは、
+ * 年金を「必要額から差し引くもの」として渡すと取り崩しが0になりうるため。
+ * 受給開始年齢が無い（古い保存など）ときは渡さず、エンジンの既定＝取り崩し開始と同時、に任せる。
+ */
+function pensionFor(scenario, use) {
+  if (use === false) return { otherMonthlyIncome: 0 };
+  var out = { otherMonthlyIncome: scenario.pension || 0 };
+  if (scenario.pensionFromAge > 0) out.otherMonthlyIncomeFromAge = scenario.pensionFromAge;
+  return out;
+}
+
+/**
+ * 取り崩しを始めた年（初年度）に、もう年金を受け取っているか。
+ * 画面で「初年度の取り崩し＋年金＝使える額」と足すのは、これが真のときだけ。
+ * 受給開始が後なら、初年度は取り崩しだけで暮らしている（エンジンもそう計算している）。
+ */
+function pensionAtStart(scenario, withdrawFrom) {
+  if (!((scenario.pension || 0) > 0)) return false;
+  return !(scenario.pensionFromAge > withdrawFrom);
+}
+
+/** エンジンへの入力に年金を足して返す。呼び出し側は withPension({ … }, 計画, 使うか) と書く */
+function withPension(input, scenario, use) {
+  var p = pensionFor(scenario, use);
+  for (var k in p) input[k] = p[k];
+  return input;
+}
+
+/**
  * usePension が真のときだけ、年金を「必要額から差し引くもの」として渡す。
  * 率で決まるルールに年金を渡すと『年金があるぶん取り崩しを減らす』挙動になり、
  * 年金が率の額を上回ると取り崩しが0になってしまう。率ルールでは年金は加算するもの。
  */
 function runWithdrawal(cfg, strategy, usePension, untilAge) {
-  return C.monteCarloLifecycle({
+  return C.monteCarloLifecycle(withPension({
     startYear: START_YEAR, startAge: cfg.age,
     accumulationYears: cfg.years, withdrawalYears: withdrawalYearsOf(cfg, untilAge),
     funds: cfg.funds, plans: cfg.plans, buys: cfg.buys, initialHoldings: cfg.initialHoldings,
     idecoAnnualLimit: cfg.idecoAnnualLimit,
     strategy: strategy, trials: Math.min(800, cfg.trials), seed: SEED,
-    annualInflation: cfg.inflation, correlation: cfg.correlation,
-    otherMonthlyIncome: usePension ? (cfg.scenario.pension || 0) : 0,
-    // 受給開始年齢。取り崩し開始より後なら、その間は取り崩しだけで暮らす計算になる
-    otherMonthlyIncomeFromAge: cfg.scenario.pensionFromAge || cfg.withdrawFrom
-  });
+    annualInflation: cfg.inflation, correlation: cfg.correlation
+  }, cfg.scenario, usePension));
 }
 
   var MAX_HOLDINGS = 12;
@@ -10021,8 +10055,14 @@ function runWithdrawal(cfg, strategy, usePension, untilAge) {
           name: "希望額でまかなう", tag: "月" + (desired / 10000).toFixed(1) + "万円",
           desc: "毎月この額を使い続ける前提で、100歳まで資金が残るかを見ます。" +
             (pension > 0
-              ? "うち月" + (pension / 10000).toFixed(1) + "万円は年金でまかなうので、取り崩すのは月" +
-                (Math.max(0, desired - pension) / 10000).toFixed(1) + "万円です。"
+              ? (pensionAtStart(cfg.scenario, cfg.withdrawFrom)
+                ? "うち月" + (pension / 10000).toFixed(1) + "万円は年金でまかなうので、取り崩すのは月" +
+                  (Math.max(0, desired - pension) / 10000).toFixed(1) + "万円です。"
+                // 受給開始が後なら、それまでは全額を取り崩す。ここを書き分けないと初年度の額と矛盾する
+                : "年金（月" + (pension / 10000).toFixed(1) + "万円）は" + cfg.scenario.pensionFromAge +
+                  "歳から。それまでの" + (cfg.scenario.pensionFromAge - cfg.withdrawFrom) +
+                  "年間は全額を取り崩し、その後は取り崩しが月" +
+                  (Math.max(0, desired - pension) / 10000).toFixed(1) + "万円になります。")
               : ""),
           s: { kind: "fixedAmount", monthlyAmount: desired, inflationAdjust: true },
           // 希望額の場合だけ、年金は「必要額から差し引くもの」として渡す
@@ -10049,9 +10089,13 @@ function runWithdrawal(cfg, strategy, usePension, untilAge) {
           "<div style='font-size:11.5px;color:var(--ink-muted)'>月 " +
           (first / 12 / 10000).toFixed(1) + "万円</div>" +
           (pension > 0
-            ? "<div style='font-size:11px;color:var(--ink-faint)'>＋年金 " +
-              (pension / 10000).toFixed(1) + "万<br><b style='color:var(--ink-muted)'>= 使える 月" +
-              (first / 12 / 10000 + pension / 10000).toFixed(1) + "万円</b></div>"
+            ? (pensionAtStart(cfg.scenario, cfg.withdrawFrom)
+              ? "<div style='font-size:11px;color:var(--ink-faint)'>＋年金 " +
+                (pension / 10000).toFixed(1) + "万<br><b style='color:var(--ink-muted)'>= 使える 月" +
+                (first / 12 / 10000 + pension / 10000).toFixed(1) + "万円</b></div>"
+              // 初年度にはまだ年金が無い。足すと、受け取っていない年金を使える額に数えてしまう
+              : "<div style='font-size:11px;color:var(--ink-faint)'>年金は " +
+                cfg.scenario.pensionFromAge + "歳から<br>（初年度は取り崩しだけ）</div>")
             : "") + "</td>" +
           '<td class="n" style="font-size:12px;color:var(--ink-muted)">' +
           (trail.length ? trail.join("<br>") : "—") + "</td>" +
@@ -10245,16 +10289,14 @@ function runWithdrawal(cfg, strategy, usePension, untilAge) {
         if (pension > 0) anyPension = true;
 
         applyOverrides(sc);
-        var r = C.monteCarloLifecycle({
+        var r = C.monteCarloLifecycle(withPension({
           startYear: START_YEAR, startAge: cfg.age,
           accumulationYears: cfg.years, withdrawalYears: wdYears,
           funds: cfg.funds, plans: cfg.plans, buys: cfg.buys, initialHoldings: cfg.initialHoldings,
           idecoAnnualLimit: cfg.idecoAnnualLimit,
           strategy: st.s, trials: Math.min(600, cfg.trials), seed: SEED,
           annualInflation: cfg.inflation, correlation: cfg.correlation,
-          // 率で決まるルールに年金を渡すと取り崩しが0になりうる。希望額のときだけ渡す
-          otherMonthlyIncome: st.usePension ? pension : 0
-        });
+        }, sc, st.usePension));
         var first = r.withdrawalByYear[0] ? r.withdrawalByYear[0].p50 : 0;
         var monthly = first / 12;
 
@@ -10263,9 +10305,14 @@ function runWithdrawal(cfg, strategy, usePension, untilAge) {
           cfg.age + "歳→" + cfg.withdrawFrom + "歳</span></td>" +
           '<td class="n">' + cfg.withdrawFrom + "歳</td>" +
           '<td class="n">月 ' + (monthly / 10000).toFixed(1) + "万円</td>" +
-          '<td class="n">' + (pension > 0 ? (pension / 10000).toFixed(1) + "万円" : "—") + "</td>" +
+          // 初年度にまだ年金が出ていないパターンでは、足さずに開始年齢を示す
+          '<td class="n">' + (pension > 0
+            ? (pensionAtStart(sc, cfg.withdrawFrom)
+              ? (pension / 10000).toFixed(1) + "万円"
+              : "<span style='font-size:11.5px'>" + sc.pensionFromAge + "歳から</span>")
+            : "—") + "</td>" +
           '<td class="n" style="color:var(--accent)"><b>月 ' +
-          ((monthly + pension) / 10000).toFixed(1) + "万円</b></td>" +
+          ((monthly + (pensionAtStart(sc, cfg.withdrawFrom) ? pension : 0)) / 10000).toFixed(1) + "万円</b></td>" +
           '<td class="n">' + pct(r.successRate) + "</td>" +
           '<td class="n">' + man(r.totalWithdrawnReal.p50) + "</td></tr>";
       }).join("");
