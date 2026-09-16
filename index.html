@@ -606,7 +606,7 @@
 <p data-tier="all"><b>計算の前提</b> 基準価額は全ファンド10,000から開始し、毎月の積立を月初に行い、その月のリターンと信託報酬（月割）を反映します。すでに持っている投信は、いま入力した評価額から同じ値動きで増減します。課税口座の売却益には20.315%の税がかかる計算です（NISA・iDeCoの売却益は非課税）。</p>
 <p data-tier="all"><b>データの出所</b> ファンドの正式名称・運用会社・指定指数は金融庁「つみたて投資枠対象商品届出一覧」（2026-08-18 時点）。信託報酬は集約サイトから取得した値を収録しており、<b>340本のうち裏を取れているのは12本だけです</b>（交付目論見書で直接確認 4本、投資信託協会の投信総合検索ライブラリーで照合 8本）。それ以外は集約サイトの値のままで、一次ソースは未確認です。</p>
 <p data-tier="all"><b>このツールがしないこと</b> 銘柄の推奨・スコアリング・順位付け・売買タイミングの判断は行いません。商品一覧は名前順で、並び順に優劣の意味はありません。逆算して出した金額は「この仮定のもとで、この確率なら足りる」という計算結果であって、その額を積むべきだという助言ではありません。</p>
-<p data-tier="all"><b>入力したものの扱い</b> 年齢・金額・商品の選択は<b>この端末のブラウザの中だけで計算しており、その内容をどこにも送信していません</b>。続きから使えるように、同じブラウザの保存領域（localStorage）に入力を残しています。共有の端末で使った場合は「はじめからやり直す」を押すと消えます。</p>
+<p data-tier="all"><b>入力したものの扱い</b> 年齢・金額・商品の選択は<b>この端末のブラウザの中だけで計算しており、その内容をどこにも送信していません</b>。続きから使えるように、同じブラウザの保存領域（localStorage）に入力を残しています。共有の端末で使った場合は「はじめからやり直す」を押すと消えます。なお、この画面が開かれた回数と計算ボタンが押された回数だけを数えています（入れた金額や年齢は含みません）。数えているのは roots0318tech.goatcounter.com で、Cookieは使っていません。</p>
 <p data-tier="all"><b>作っている人</b> roots0318-tech（<a href="https://note.com/norgz1" target="_blank" rel="noopener noreferrer">note</a>）。ご指摘・お問い合わせは<a href="https://github.com/roots0318-tech/nisa/issues" target="_blank" rel="noopener noreferrer">GitHubのIssue</a>へ。計算の誤りの指摘はとくに歓迎します。</p>
 
 </footer>
@@ -8568,7 +8568,7 @@ ${xrefAt}
   var C = window.NisaCore;
   var NL = String.fromCharCode(10);
 
-    var SITE = {"baseUrl":"https://roots0318-tech.github.io/nisa","operator":{"name":"roots0318-tech","noteUrl":"https://note.com/norgz1","contactUrl":"https://github.com/roots0318-tech/nisa/issues","contactLabel":"GitHubのIssue"},"metrics":{"endpoint":"","siteId":""}};
+    var SITE = {"baseUrl":"https://roots0318-tech.github.io/nisa","operator":{"name":"roots0318-tech","noteUrl":"https://note.com/norgz1","contactUrl":"https://github.com/roots0318-tech/nisa/issues","contactLabel":"GitHubのIssue"},"metrics":{"endpoint":"https://roots0318tech.goatcounter.com/count","siteId":"roots0318tech"}};
   /* ==========================================================================
  * 紙芝居版と詳細版で共有する土台。
  *

@@ -640,7 +640,7 @@
 <p data-tier="detail"><b>収録範囲</b> つみたて投資枠の対象商品は、信託報酬を突き合わせられたものをすべて収録しています。一方<b>成長投資枠の対象商品は2,260本あり、そのごく一部しか収録できていません</b>（投資信託協会の一覧に信託報酬が含まれず、一括取得の手段がないため）。一覧に無い商品は「＋ 自分で入力する」から登録できます。</p>
 <p data-tier="detail"><b>資産クラスの当て方</b> 期待リターンは資産クラス単位で置いており、<b>銘柄を絞った商品でも期待リターンは上乗せしていません</b>（集中するぶんはボラティリティのみ高くしています）。アクティブ運用の商品も同じ資産クラスの指数と同じ期待リターンを置いています。運用の巧拙を数字に織り込むと、それ自体が優劣の判断になるためです。金は配当も利息も生まないため、<b>仮定の信頼度が最も低い区分</b>です。</p>
 <p data-tier="all"><b>このツールがしないこと</b> 銘柄の推奨・スコアリング・順位付け・売買タイミングの判断は行いません。商品一覧は名前順で、並び順に優劣の意味はありません。逆算して出した金額は「この仮定のもとで、この確率なら足りる」という計算結果であって、その額を積むべきだという助言ではありません。</p>
-<p data-tier="all"><b>入力したものの扱い</b> 年齢・金額・商品の選択は<b>この端末のブラウザの中だけで計算しており、その内容をどこにも送信していません</b>。続きから使えるように、同じブラウザの保存領域（localStorage）に入力を残しています。共有の端末で使った場合は「はじめからやり直す」を押すと消えます。</p>
+<p data-tier="all"><b>入力したものの扱い</b> 年齢・金額・商品の選択は<b>この端末のブラウザの中だけで計算しており、その内容をどこにも送信していません</b>。続きから使えるように、同じブラウザの保存領域（localStorage）に入力を残しています。共有の端末で使った場合は「はじめからやり直す」を押すと消えます。なお、この画面が開かれた回数と計算ボタンが押された回数だけを数えています（入れた金額や年齢は含みません）。数えているのは roots0318tech.goatcounter.com で、Cookieは使っていません。</p>
 <p data-tier="all"><b>作っている人</b> roots0318-tech（<a href="https://note.com/norgz1" target="_blank" rel="noopener noreferrer">note</a>）。ご指摘・お問い合わせは<a href="https://github.com/roots0318-tech/nisa/issues" target="_blank" rel="noopener noreferrer">GitHubのIssue</a>へ。計算の誤りの指摘はとくに歓迎します。</p>
 
   </div>
@@ -8597,7 +8597,7 @@ ${xrefAt}
   var NL = String.fromCharCode(10);
   "use strict";
   var C = window.NisaCore;
-    var SITE = {"baseUrl":"https://roots0318-tech.github.io/nisa","operator":{"name":"roots0318-tech","noteUrl":"https://note.com/norgz1","contactUrl":"https://github.com/roots0318-tech/nisa/issues","contactLabel":"GitHubのIssue"},"metrics":{"endpoint":"","siteId":""}};
+    var SITE = {"baseUrl":"https://roots0318-tech.github.io/nisa","operator":{"name":"roots0318-tech","noteUrl":"https://note.com/norgz1","contactUrl":"https://github.com/roots0318-tech/nisa/issues","contactLabel":"GitHubのIssue"},"metrics":{"endpoint":"https://roots0318tech.goatcounter.com/count","siteId":"roots0318tech"}};
   /* ==========================================================================
  * 紙芝居版と詳細版で共有する土台。
  *
